@@ -1,0 +1,100 @@
+:root{
+    --blanco: #ffffff;
+    --negro: #212121;
+    --primario: #f08d42;
+    --secundario: #F05A41 ;
+    --terciario: #417FF0;
+    --cuaternario: #41DCF0 ;
+    --quintario: #082130;
+    --calificacion: #ffcc00;
+  
+    --fuentePrincipal: 3.8rem;
+  }
+  
+  .calificacion-card {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--primario);
+    color: #ffffff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease-in-out;
+    width: 13rem;
+    height: 20rem;
+    margin: 20px;
+  }
+  
+  .calificacion-card:hover {
+    transform: translateY(-5px);
+  }
+  
+  .calificacion-card img {
+    width: 60%;
+    height: 10em;
+    object-fit: cover;
+  }
+  
+  .calificacion-card-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .calificacion-card-title{
+    font-size: medium;
+    font-weight: bold;
+    color: var(--quintario);
+    margin-bottom: 5px;
+  }
+  
+  
+  .calificacion-card-description {
+    font-size: 0.9em;
+    color: var(--quintario);
+    line-height: 1.4;
+  
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 15px;
+  }
+  
+  .calificacion-card-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--calificacion);
+  }
+  
+  .calificacion-card-platform,
+  .calificacion-card-calificacion {
+    background-color: var(--secundario);
+    padding: 5px 10px;
+    border-radius: 5px;
+  }
+  
+  .calificacion-card-calificacion span {
+    color: var(--calificacion);
+    font-weight: bold;
+  }
+  
+  .calificacion-card-age {
+    font-size: 0.8em;
+    background-color: var(--secundario);
+    color: var(--blanco);
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-weight: bold;
+  }
+  
+  .calificacion-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px;
+  }
+  
+  
