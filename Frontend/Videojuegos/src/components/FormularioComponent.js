@@ -1,13 +1,17 @@
 import React, { useState } from "react";
 import './Estilos.css';
-import { verificarClave, verificarNombre } from "./VerificarDatos";
-import { Link } from "react-router-dom";
+
 
 const Formulario = ({ onData, loading }) => {
   const [nombre_usuario, setNombre_Usuario] = useState('');
   const [clave, setClave] = useState('');
   const [error, setError] = useState('');
-
+  const regexclave= /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$/;
+  const regexUsuario= /^[a-zA-Z0-9]{6,20}$/;
+  function verificarNombre(nombre_usuario){
+    return (regexUsuario.test(nombre_usuario))};
+  function verificarClave(clave){
+    return(regexclave.test(clave))};
 
   const handleSubmit = (e) => {
     e.preventDefault();

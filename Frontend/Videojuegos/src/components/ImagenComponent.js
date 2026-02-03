@@ -1,4 +1,4 @@
-//https://i.pinimg.com/564x/90/81/7b/90817b2a591d9d34e7992078c464429c.jpg
+
 
 export default function Imagen(){
     return(

@@ -1,9 +1,8 @@
 import React from "react";
-import Estrellas from "./Estrellas";
 import './CalificacionCard.css';
+import { FaStar } from "react-icons/fa";
 
 function CalificacionCard(props){
-    //const {nombre}=nombre
     const {calificacion}=props
     function cantestrellas(calificacion){
         var estrella=[];
@@ -14,27 +13,39 @@ function CalificacionCard(props){
         const estrellas=estrella.map((estrella)=>{
             return(
               <li key={estrella}>
-                <Estrellas/> 
+                <FaStar/> 
               </li>
             )
           })
           return estrellas;
         } 
-        
+    const usuarioact= localStorage.getItem("nombre_usuario");
     
 
     const cantidadEstrellas=cantestrellas(calificacion);
-
+    if(calificacion.usuario === usuarioact){
+      return(
+        <div className="calificacion-card-actual">
+        <article className="calificacion-card-actual-content">
+            <h3 className="calificacion-card-actual-title">Tu Calificacion</h3>
+            <p className="calificacion-card-actual-usuario">Nombre Usuario: {calificacion.usuario}</p>
+            <p className="calificacion-card-actual-calificacion">Calificacion <ul className="calificacion-card-actual-info ">{cantidadEstrellas}</ul></p>
+            
+        </article>
+        </div>
+      )
+    }else{
     return(
         <div className="calificacion-card">
         <article className="calificacion-card-content">
-            <h3>Calificacion</h3>
-            <p>Usuario {calificacion.usuario}</p>
-            <p className="calificacion-card-info">Calificacion <ul className="calificacion-card-info ">{cantidadEstrellas}</ul></p>
+            <h3 className="calificacion-card-title">Calificacion</h3>
+            <p className="calificacion-card-usuario">Nombre Usuario: {calificacion.usuario}</p>
+            <p className="calificacion-card-calificacion">Calificacion <ul className="calificacion-card-info ">{cantidadEstrellas}</ul></p>
             
         </article>
         </div>
     )
+  }
 }
 
 export default CalificacionCard;

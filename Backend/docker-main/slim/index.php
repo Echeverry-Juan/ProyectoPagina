@@ -2,6 +2,7 @@
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use Slim\App;
 use Slim\Factory\AppFactory;
 use Slim\Psr7\Header;
 
@@ -66,7 +67,8 @@ function verificarcontraseña($contraseña){
 
 //verificacion juego
 function convertirimagen($imagen){
-    return base64_encode($imagen);
+    $imagenencode= base64_encode($imagen);
+    return $imagenencode;
 }
 
 //verificar nombre del juego
@@ -154,6 +156,13 @@ function generardate(){
     return $datemas;
 }
 
+// Función para obtener el ID de la plataforma
+function obtenerPlataformaId($plataforma_nombre, $conexion) {
+    $resultado = mysqli_query($conexion, "SELECT id FROM plataforma WHERE nombre = '$plataforma_nombre'");
+    $fila = mysqli_fetch_assoc($resultado);
+    return $fila ? $fila['id'] : null;
+}
+
 
 // Login, verificar credenciales y retornar token
 $app->post('/login', function(Request $request, Response $response, $args){
@@ -172,11 +181,13 @@ $app->post('/login', function(Request $request, Response $response, $args){
     if($nombre_usuario!=null && $clave!=null){
     $verificacion= mysqli_query($conexion, "SELECT * FROM usuario WHERE nombre_usuario = '$nombre_usuario' AND clave = '$clave'");
     if(verificarsiexiste($verificacion)){
+        $dataadmin= mysqli_query($conexion,"SELECT u.es_admin as admin FROM usuario u WHERE nombre_usuario = '$nombre_usuario' AND clave = '$clave'");
+        $esadmin=mysqli_fetch_all($dataadmin, MYSQLI_ASSOC);
         $token= '';
         $token= generartoken();//generar token
         $horamas1= generardate(); //genero el tiempo que va a durar el token
         mysqli_query($conexion,"UPDATE usuario SET token = '$token', vencimiento_token = '$horamas1'  WHERE usuario.nombre_usuario = '$nombre_usuario' ");
-        $payload = json_encode($token);
+        $payload = json_encode(['token' => $token, 'es_admin' => $esadmin[0]]);
         $response->getBody()->write($payload);
         return $response
             ->withHeader('Content-Type', 'application/json')
@@ -230,13 +241,15 @@ $app->post('/register', function(Request $request, Response $response, $args){
                 ->withStatus(400);
         }
     }else{
-        $response->getBody()->write('El nombre de usuario ya existe');
+        $payload = json_encode('El nombre de usuario ya existe');
+        $response->getBody()->write($payload);
             return $response
                 ->withHeader('Content-Type', 'application/json')
                 ->withStatus(400);
     }
     }else{
-        $response->getBody()->write('Debe ingresar ambos datos');
+        $payload = json_encode('Debe ingresar ambos datos');
+        $response->getBody()->write($payload);
             return $response
                 ->withHeader('Content-Type', 'application/json')
                 ->withStatus(400);
@@ -495,109 +508,79 @@ $app->get('/usuario/{id}', function (Request $request, Response $response, $args
 
 // JUEGOS
 
-//Listar los juegos de la página según los parámetros de búsqueda incluyendo la puntuación promedio del juego.
-$app->get('/juegos', function (Request $request, Response $response, $args){
-    $conexion= enlace(); 
+$app->get('/juegos', function (Request $request, Response $response, $args) {
+    $conexion = enlace();
     $datos = $request->getQueryParams();
 
-    //j.nombre,j.descripcion,j.clasificacion_edad,j.imagen
-    $pagina1="LIMIT 0,5";
-    $consulta="SELECT j.id,j.nombre,j.descripcion,j.clasificacion_edad,j.imagen,p.nombre AS plataforma, AVG(c.estrellas) AS puntuacion_promedio FROM juego j LEFT JOIN calificacion c ON j.id = c.juego_id LEFT JOIN soporte s ON j.id = s.juego_id LEFT JOIN plataforma p ON s.plataforma_id = p.id";
-    if($datos == null){
-        $juegos= mysqli_query($conexion,"$consulta group by j.id, p.nombre order by puntuacion_promedio,j.nombre,j.id $pagina1"); 
-        if(verificarsiexiste($juegos)){
-        $datos= mysqli_fetch_all($juegos, MYSQLI_ASSOC);
-        $payload = json_encode($datos);
-            $response->getBody()->write($payload);
-            return $response
-                ->withHeader('Content-Type', 'application/json')
-                ->withStatus(200);
-        }else{
-            $payload = json_encode('No hay juegos');
-            $response->getBody()->write($payload);
-            return $response
-                ->withHeader('Content-Type', 'application/json')
-                ->withStatus(404);
-        }
-    }else{
-        $atributos="";
-        if(isset($datos['plataforma'])){
-            $plataforma=$datos['plataforma'];
-            if(strlen($atributos > 0)){
-                $atributos .= "AND p.nombre= '$plataforma' ";
-            }else{
-            $atributos .= " WHERE p.nombre= '$plataforma'";
-            }
-        }else{
-            $plataforma=null;
-        }
+
+    $consulta = "SELECT j.id, 
+                    j.nombre, 
+                    j.descripcion, 
+                    j.clasificacion_edad, 
+                    j.imagen, 
+                    GROUP_CONCAT(DISTINCT p.nombre ORDER BY p.nombre ASC) AS plataformas, 
+                    ROUND(AVG(c.estrellas), 1) AS puntuacion_promedio FROM juego j 
+             LEFT JOIN calificacion c ON j.id = c.juego_id 
+             LEFT JOIN soporte s ON j.id = s.juego_id 
+             LEFT JOIN plataforma p ON s.plataforma_id = p.id";
+
+    $atributos = "";
+
+    if (isset($datos['plataforma'])) {
+        $plataforma = $datos['plataforma'];
+        $atributos .= " WHERE p.nombre = '$plataforma'";
+    }
+
+    if (isset($datos['texto'])) {
+        $texto = $datos['texto'];
+        $atributos .= strlen($atributos) > 0 ? " AND" : " WHERE";
+        $atributos .= " j.nombre LIKE '%$texto%'";
+    }
+
+    if (isset($datos['clasificacion'])) {
+        $clasificacion = $datos['clasificacion'];
         
-        if(isset($datos['clasificacion'])){
-            $clasificacion=$datos['clasificacion'];
-            if(strlen($atributos) > 0){
-                if($clasificacion= "ATP"){
-                    $atributos .= "AND j.clasificacion_edad = '$clasificacion'";
-                    
-                }else{
-                    if($clasificacion= "13"){
-                        $atributos .= "AND j.clasificacion_edad = '+13' OR  j.clasificacion_edad = 'ATP' ";
-                        
-                    }else{
-                        if($clasificacion= "18"){
-                            $atributos .= "AND j.clasificacion_edad = '+18' OR j.clasificacion_edad = 'ATP' OR j.clasificacion_edad = '+13'";
-                            
-                        }
-                    }
-                }
-            }else{
-                $atributos .=" WHERE j.clasificacion_edad = '$clasificacion'";
-            }
-        }else{
-            $clasificacion=null;
+        if ($clasificacion == "ATP") {
+            $atributos .= strlen($atributos) > 0 ? " AND" : " WHERE";
+            $atributos .= " j.clasificacion_edad = 'ATP'";
+        } elseif ($clasificacion == "+13") {
+            $atributos .= strlen($atributos) > 0 ? " AND" : " WHERE";
+            $atributos .= " (j.clasificacion_edad = '+13' OR j.clasificacion_edad = 'ATP')";
+        } elseif ($clasificacion == "+18") {
+            $atributos .= strlen($atributos) > 0 ? " AND" : " WHERE";
+            $atributos .= " (j.clasificacion_edad = '+18' OR j.clasificacion_edad = '+13' OR j.clasificacion_edad = 'ATP')";
         }
-        if(isset($datos['texto'])){
-            $texto=$datos['texto'];
-            if(strlen($atributos) > 0){
-                $atributos .= " AND j.nombre LIKE  '%$texto%' ";
-            }else{
-                $atributos .=" WHERE j.nombre LIKE '%$texto%'";
-            }
-        }else{
-            $texto=null;
-        }
-        if(isset($datos['pagina'])){
-            $pagina=$datos['pagina'];
-            $registros= 5;
-            if(is_numeric($pagina)){
-                $inicio= (($pagina-1)*$registros);
-                $paginacion = "LIMIT $inicio,$registros";
-            }
-        }else{
-            $paginacion="";
-            $pagina=null;
-        }
-        $consulta.=$atributos;
-            if(strlen($paginacion)>0 && ctype_digit($pagina)){
-                $juegos= mysqli_query($conexion, " $consulta group by j.id, p.nombre order by puntuacion_promedio,j.nombre,j.id $paginacion ");
-            }else{
-                $juegos= mysqli_query($conexion, " $consulta group by j.id, p.nombre order by puntuacion_promedio,j.nombre,j.id $pagina1 ");
-            }
-            if(verificarsiexiste($juegos)){
-            $data= mysqli_fetch_all($juegos, MYSQLI_ASSOC);
-            $payload = json_encode($data);
-            $response->getBody()->write($payload);
-            return $response
-                ->withHeader('Content-Type', 'application/json')
-                ->withStatus(200);
-            }else{
-                $payload = json_encode('No existe el juego');
-                $response->getBody()->write($payload);
-                return $response
-                    ->withHeader('Content-Type', 'application/json')
-                    ->withStatus(404);
-            }
-        } 
-    return $response;
+    }
+
+
+    $pagina = isset($datos['pagina']) && is_numeric($datos['pagina']) ? (int)$datos['pagina'] : 1;
+    $registros = 5;
+    $inicio = ($pagina - 1) * $registros;
+    $paginacion = "LIMIT $inicio, $registros";
+
+    $consultaFinal = "$consulta $atributos GROUP BY j.id ORDER BY puntuacion_promedio DESC,j.nombre, j.id $paginacion";
+    $juegos = mysqli_query($conexion, $consultaFinal);
+
+    $consultapags="$consulta $atributos GROUP BY j.id ORDER BY puntuacion_promedio DESC, j.id ";
+    $cantpags=mysqli_query($conexion, $consultapags);
+    $datapags = mysqli_fetch_all($cantpags, MYSQLI_ASSOC);
+    $totalPaginas = ceil(count($datapags) / 5);
+
+    if (verificarsiexiste($juegos)) {
+        $data = mysqli_fetch_all($juegos, MYSQLI_ASSOC);
+        
+        $responseData = [
+            'juegos' => $data,
+            'totalPaginas' => $totalPaginas,
+        ];
+        $payload = json_encode($responseData);
+        $response->getBody()->write($payload);
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+    } else {
+        $payload = json_encode('No existe el juego');
+        $response->getBody()->write($payload);
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+    }
 });
 
 
@@ -606,8 +589,10 @@ $app->get('/juegos', function (Request $request, Response $response, $args){
 $app->get('/juegos/{id}', function (Request $request, Response $response, $args) {
     $conexion = enlace();
     $idact = $request->getAttribute('id');
-    $result = mysqli_query($conexion, "SELECT j.id as id, j.nombre, j.descripcion, j.clasificacion_edad, j.imagen, p.nombre AS plataforma, AVG(c.estrellas) AS puntuacion_promedio FROM juego j LEFT JOIN calificacion c ON j.id = c.juego_id LEFT JOIN soporte s ON j.id = s.juego_id LEFT JOIN plataforma p ON s.plataforma_id = p.id WHERE j.id = '$idact' GROUP BY j.id, p.nombre ORDER BY puntuacion_promedio, j.nombre, j.id");
-    $result2 = mysqli_query($conexion, "SELECT c.estrellas, c.usuario_id as usuario, c.id as idcalificacion FROM calificacion c WHERE juego_id = '$idact'");
+
+    $result = mysqli_query($conexion, "SELECT j.id, 
+                    j.nombre,j.descripcion,j.clasificacion_edad, j.imagen, GROUP_CONCAT(DISTINCT p.nombre ORDER BY p.nombre ASC) AS plataformas, ROUND(AVG(c.estrellas), 1) AS puntuacion_promedio FROM juego j LEFT JOIN calificacion c ON j.id = c.juego_id LEFT JOIN soporte s ON j.id = s.juego_id LEFT JOIN plataforma p ON s.plataforma_id = p.id WHERE j.id = '$idact' GROUP BY j.id ORDER BY puntuacion_promedio, j.nombre, j.id");
+    $result2 = mysqli_query($conexion, "SELECT c.estrellas, c.id as idcalificacion,u.nombre_usuario as usuario FROM calificacion c LEFT JOIN usuario u ON c.usuario_id= u.id  WHERE juego_id = '$idact' ORDER BY u.nombre_usuario DESC");
 
     if (verificarsinoexiste($result2)) {
         if (verificarsiexiste($result)) {
@@ -638,78 +623,61 @@ $app->get('/juegos/{id}', function (Request $request, Response $response, $args)
 
 //Agregar juego nuevo (el usuario debe ser administrador)
 $app->post('/juego', function (Request $request, Response $response, $args) {
-    $conexion= enlace();
-    $datos= $request->getParsedBody();
-    if(isset($datos['nombre'])){
-        $nombrejuego= $datos['nombre'];
-    }else{
-        $nombrejuego=null;
-    }
-    if(isset($datos['descripcion'])){
-        $descripcion= $datos['descripcion'];
-    }else{
-        $descripcion=null;
-    }
-    if(isset($datos['imagen'])){
-        $imagen= convertirimagen($datos['imagen']);
-    }else{
-        $imagen=null;
-    }
-    if(isset($datos['clasificacion'])){
-        $clasificacion_edad= $datos['clasificacion'];
-    }else{
-        $clasificacion_edad=null;
-    }
+    $conexion = enlace();
+    $datos = $request->getParsedBody();
 
-    if(isset($datos['token'])){
-        $token= $datos['token'];
-    }else{
-        $token=null;
-    }
-    $hora=horaactual();
-    if($token!=null){
-        $verificacion= mysqli_query($conexion, "SELECT * FROM usuario WHERE  token = '$token' AND vencimiento_token > '$hora' AND es_admin = 1");    
-        if(verificarsiexiste($verificacion)){
-         if($nombrejuego!=null && $descripcion!=null && $imagen!=null && $clasificacion_edad!=null){
-            $existeeljuego= mysqli_query($conexion, "SELECT * FROM juego WHERE nombre = '$nombrejuego'");
-            if(verificarsinoexiste($existeeljuego) and verificacionjuego($nombrejuego,$clasificacion_edad)== true){
-                mysqli_query($conexion, "INSERT INTO juego(nombre, descripcion, imagen, clasificacion_edad) VALUES ('$nombrejuego', '$descripcion', '$imagen', '$clasificacion_edad')");
-                $payload = json_encode('Se creo un nuevo juego');
+    $nombrejuego = $datos['nombre'] ?? null;
+    $descripcion = $datos['descripcion'] ?? null;
+    $imagen = isset($datos['imagen']) ? ($datos['imagen'] ) : null;
+    $clasificacion_edad = $datos['clasificacion'] ?? null;
+    $token = $datos['token'] ?? null;
+    $plataformas = $datos['plataformas'] ?? []; 
+
+    $hora = horaactual();
+    if ($token != null) {
+        $verificacion = mysqli_query($conexion, "SELECT * FROM usuario WHERE token = '$token' AND vencimiento_token > '$hora' AND es_admin = 1");
+
+        if (verificarsiexiste($verificacion)) {
+            if ($nombrejuego && $descripcion && $imagen && $clasificacion_edad) {
+                $existeeljuego = mysqli_query($conexion, "SELECT * FROM juego WHERE nombre = '$nombrejuego'");
+                if (verificarsinoexiste($existeeljuego) && verificacionjuego($nombrejuego, $clasificacion_edad)) {
+                    mysqli_query($conexion, "INSERT INTO juego(nombre, descripcion, imagen, clasificacion_edad) VALUES ('$nombrejuego', '$descripcion', '$imagen', '$clasificacion_edad')");
+                    $juego_id = mysqli_insert_id($conexion); 
+                    foreach ($plataformas as $plataforma) {
+                        $plataforma_id = obtenerPlataformaId($plataforma, $conexion); 
+                        if ($plataforma_id) {
+                            mysqli_query($conexion, "INSERT INTO soporte(juego_id, plataforma_id) VALUES ('$juego_id', '$plataforma_id')");
+                        }
+                    }
+
+                    $payload = json_encode('Se creó un nuevo juego con plataformas');
+                    $response->getBody()->write($payload);
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+                } else {
+                    $payload = json_encode('El juego ya existe o los datos son incorrectos');
+                    $response->getBody()->write($payload);
+                    return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+                }
+            } else {
+                $payload = json_encode('Debe ingresar todos los datos del juego');
                 $response->getBody()->write($payload);
-                return $response
-                    ->withHeader('Content-Type', 'application/json')
-                    ->withStatus(200);
-            }else{
-                $payload = json_encode('El juego ya existe o el nombre u La clasificacion del juego es incorrecto');
-                $response->getBody()->write($payload);
-                return $response
-                    ->withHeader('Content-Type', 'application/json')
-                    ->withStatus(400);
-                
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
             }
-        }else{
-            $payload = json_encode('Debe Ingresar todos los datos sobre el juego');
+        } else {
+            $payload = json_encode('Usuario no autorizado');
             $response->getBody()->write($payload);
-            return $response
-                ->withHeader('Content-Type', 'application/json')
-                ->withStatus(401);
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(401);
         }
-    }else{
-        $payload = json_encode('El usuario no esta logeado , no es administrador o el token es incorrecto');
-            $response->getBody()->write($payload);
-            return $response
-                ->withHeader('Content-Type', 'application/json')
-                ->withStatus(404);
-    }
-    }else{
+    } else {
         $payload = json_encode('Debe ingresar el token');
-            $response->getBody()->write($payload);
-            return $response
-                ->withHeader('Content-Type', 'application/json')
-                ->withStatus(400);
+        $response->getBody()->write($payload);
+        return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
     }
     return $response;
 });
+
+
+
 
 //editar juego
 $app->put('/juego/{id}', function (Request $request, Response $response, $args) {
@@ -737,7 +705,7 @@ $app->put('/juego/{id}', function (Request $request, Response $response, $args) 
     }else{
         $descripcion=null;
     }
-    if(isset($datos['imagen'])){
+    if(isset($imagen)){
         $imagen= convertirimagen($datos['imagen']);
         if(strlen($updatedatos)<1){
             $updatedatos.="UPDATE juego set imagen = '$imagen'";
@@ -747,7 +715,7 @@ $app->put('/juego/{id}', function (Request $request, Response $response, $args) 
     }else{
         $imagen=null;
     }
-    if(isset($datos['clasificacion'])){
+    if(isset($datos['clasificacion'])and verificacionclas($datos['clasificacion'])){
         $clasificacion_edad= $datos['clasificacion'];
         if(strlen($updatedatos)<1){
             $updatedatos.="UPDATE juego set clasificacion_edad = '$clasificacion_edad'";
@@ -771,7 +739,8 @@ $app->put('/juego/{id}', function (Request $request, Response $response, $args) 
                 if(verificarsiexiste($existeeljuego)){
                     if($nombrejuego!=null and $clasificacion_edad!=null){
                         $existeelnombre= mysqli_query($conexion, "SELECT * FROM juego WHERE nombre = '$nombrejuego'");
-                        if(verificarsinoexiste($existeelnombre)== true && verificacionjuego($nombrejuego,$clasificacion_edad)== true){
+                        $eselmismo= mysqli_query($conexion, "SELECT * FROM juego WHERE nombre = '$nombrejuego' and id='$idjuego'");
+                        if((verificarsinoexiste($existeelnombre)== true | verificarsiexiste($eselmismo) == true) && verificacionjuego($nombrejuego,$clasificacion_edad)== true){
                             mysqli_query($conexion, "$updatedatos WHERE juego.id = '$idjuego'");
                             $payload = json_encode('Se edito el juego');
                             $response->getBody()->write($payload);
@@ -789,7 +758,8 @@ $app->put('/juego/{id}', function (Request $request, Response $response, $args) 
                     }else{
                         if($nombrejuego!=null){
                             $existeelnombre= mysqli_query($conexion, "SELECT * FROM juego WHERE nombre = '$nombrejuego'");
-                            if(verificarsinoexiste($existeelnombre)== true && verificarnombrejuego($nombrejuego)== true){
+                            $eselmismo= mysqli_query($conexion, "SELECT * FROM juego WHERE nombre = '$nombrejuego' and id='$idjuego'");
+                            if((verificarsinoexiste($existeelnombre)== true | verificarsiexiste($eselmismo) == true) && verificarnombrejuego($nombrejuego)== true){
                                 mysqli_query($conexion, "$updatedatos WHERE juego.id = '$idjuego'");
                                 $payload = json_encode('Se edito el juego');
                                 $response->getBody()->write($payload);
@@ -916,6 +886,50 @@ $app->delete('/juego/{id}', function (Request $request, Response $response, $arg
 
 //Calificaciones
 
+$app->get('/calificacion', function (Request $request, Response $response, $args) {
+    $conexion = enlace();
+    $datos = $request->getQueryParams();
+    $nombre_usuario = isset ($datos['nombre_usuario']) ? $datos['nombre_usuario'] : null;
+    $nombre_juego = isset ($datos['nombre_juego']) ? $datos['nombre_juego'] : null;
+
+    if (!$nombre_usuario || !$nombre_juego) {
+        $payload = json_encode(['mensaje' => 'Faltan parámetros requeridos: nombre_usuario y/o nombre_juego']);
+        $response->getBody()->write($payload);
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(400);
+    }else{
+    // Consulta para obtener las calificaciones
+    $result = mysqli_query($conexion, "SELECT c.estrellas, c.id FROM calificacion c LEFT JOIN juego j ON c.juego_id = j.id LEFT JOIN usuario u ON c.usuario_id=u.id WHERE u.nombre_usuario = '$nombre_usuario' AND j.nombre = '$nombre_juego'");
+
+    if ($result) {
+        $datoscals = mysqli_fetch_all($result, MYSQLI_ASSOC);
+        
+        if (count($datoscals) > 0) {
+            $payload = json_encode(['calificaciones' => $datoscals]);
+            $response->getBody()->write($payload);
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(200);
+        } else {
+            $payload = json_encode(['mensaje' => 'Este usuario no tiene calificaciones']);
+            $response->getBody()->write($payload);
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(404);
+        }
+    } else {
+        $payload = json_encode(['mensaje' => 'Error al obtener las calificaciones']);
+        $response->getBody()->write($payload);
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(500);
+    }
+    }
+});
+
+
+
 
 $app->post('/calificacion', function (Request $request, Response $response, $args) {
     $conexion= enlace();
@@ -925,11 +939,6 @@ $app->post('/calificacion', function (Request $request, Response $response, $arg
     }else{
         $estrellas=null;
     }
-    if(isset($datos['idusuario'])){
-        $idus= $datos['idusuario'];
-    }else{
-        $idus=null;
-    }
     if(isset($datos['idjuego'])){
         $idjuego= $datos['idjuego'];
     }else{
@@ -937,19 +946,25 @@ $app->post('/calificacion', function (Request $request, Response $response, $arg
     }
     if(isset($datos['token'])){
         $token= $datos['token'];
+        $datous=mysqli_query($conexion,"SELECT id FROM usuario u WHERE token = '$token'");
+        $id= mysqli_fetch_all($datous, MYSQLI_ASSOC);
+        $idus=$id[0]['id'];
     }else{
         $token=null;
+        $idus=null;
     }
+    
     $hora=horaactual();
     if($token!=null){
-    $verificacion= mysqli_query($conexion, "SELECT * FROM usuario WHERE id = '$idus' AND token = '$token' AND vencimiento_token > '$hora'");
+    $verificacion= mysqli_query($conexion, "SELECT * FROM usuario WHERE  token = '$token' AND vencimiento_token > '$hora'");
     if(verificarsiexiste($verificacion)){
         if($estrellas!=null && $idus!=null && $idjuego!=null){
             $existeeljuego= mysqli_query($conexion, "SELECT * FROM juego WHERE id = '$idjuego'");
-            $masdeuna=mysqli_query($conexion,"SELECT * FROM calificacion WHERE juego_id = '$idjuego' AND usuario_id = '$idus'");
-            if(verificarestrellas($estrellas)== true && verificarsiexiste($existeeljuego) && verificarsinoexiste($masdeuna)== true){
+            $masdeuna=mysqli_query($conexion,"SELECT * FROM calificacion c  WHERE juego_id = '$idjuego' AND usuario_id = '$idus'");
+            if(verificarestrellas($estrellas) && verificarsiexiste($existeeljuego) && verificarsinoexiste($masdeuna)){
                 mysqli_query($conexion, "INSERT INTO calificacion (estrellas, usuario_id, juego_id) VALUES ('$estrellas', '$idus', '$idjuego')");
-                $payload = json_encode('Se creo una nueva calificacion');
+                $idcal = mysqli_insert_id($conexion);
+                $payload = json_encode($idcal);
                 $response->getBody()->write($payload);
                 return $response
                     ->withHeader('Content-Type', 'application/json')

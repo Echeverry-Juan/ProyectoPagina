@@ -5,6 +5,8 @@ import JuegoCard from "../../components/JuegoCard";
 import Header from "../../components/HeaderComponent";
 import NavBar from "../../components/NavBarComponent";
 import CalificacionCard from "../../components/CalificacionCard";
+import  '../../components/CalificacionCard.css';
+import CalificacionEstrella from "../../components/CalificacionEstrellas";
 
 const url = process.env.REACT_APP_BACK_URL;
 
@@ -14,33 +16,43 @@ const Juego = () => {
   const [error, setError] = useState(false);
   const [juego, setJuego] = useState(null);
   const [calificaciones, setCalificaciones] = useState([]);
+  const [calificacion, setCalificacion] = useState([]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [calificacion]);
 
   const loadData = () => {
+    setLoading(true);
+    setCalificacion(false);
+    setJuego([]);
+    setCalificaciones([]);
+
     axios
       .get(`${url}/juegos/${id}`)
       .then((response) => {
         setError(false);
         setLoading(false);
-
-        // Ajusta los datos recibidos del backend
         setJuego(response.data.juego);
         setCalificaciones(response.data.calificaciones);
       })
       .catch((error) => {
         setLoading(false);
-        setError(true);
+        setError(error.response.data);
       });
   };
 
+
+  const nuevoProm=()=>{
+    setCalificacion(true);
+  }
+
+
   const renderJuego = () => {
-    return juego ? (
-      <li key={juego.id}>
+    return juego ? (<div>
         <JuegoCard juego={juego} />
-      </li>
+        <CalificacionEstrella juego={juego} onRatingChange={nuevoProm}/>
+        </div>
     ) : (
       <li className="card">No existe información del juego</li>
     );
@@ -54,7 +66,7 @@ const Juego = () => {
         </li>
       ))
     ) : (
-      <li className="card">No posee calificaciones</li>
+      <li className="calificacion-card"><p className="calificacion-card-title">No posee calificaciones</p></li>
     );
   };
 

@@ -1,54 +1,7 @@
-/*import React, { useState, useEffect } from "react";
-
-import Formulario from "../../components/FormularioComponent";
-
-import axios from "axios";
-import { Navigate } from "react-router-dom";
-import verificar from "../../components/VerificarDatos";
-
-
-
-const url = process.env.REACT_APP_BACK_URL;
-
-const Register = () => {
-        const [loading, setLoading] = useState(true);
-        const [error, setError] = useState("");
-        const [usuario, setUsuario] = useState([]);
-
-        useEffect(()=>{
-        setUsuario(localStorage.getItem("usuario"))
-        if(verificar(usuario)){
-        loadData()}
-      },[]
-      )
-      const loadData= ()=>{
-        axios
-        .post(`${url}/login`,usuario)
-        .then((response) => {
-          setError(false);
-          setLoading(false);
-          localStorage.setItem("token",response.data.data.token)
-          localStorage.setItem("usuariolog",response.data.usuario)
-          Navigate('/')
-        })
-        .catch((error) => {
-          setLoading(false);
-          setError(error);
-          
-        });
-      }
-
-    return(
-        <div>
-            <Formulario/>
-        </div>
-    )
-}
-export default Register;*/
 import React, { useState } from 'react';
 import axios from 'axios';
 import Formulario from '../../components/FormularioComponent';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const url = process.env.REACT_APP_BACK_URL;
 
@@ -56,6 +9,7 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
   const handleRegister = ({ nombre_usuario, clave }) => {
     setLoading(true);
@@ -71,20 +25,30 @@ const Register = () => {
           setSuccess('Registro exitoso. Puedes iniciar sesión.');
         }
       })
-      .catch(() => {
-        setError('Hubo un error en el registro. Inténtalo de nuevo.');
+      .catch((error) => {
+        //cambios
+        setError(error.response?.data || "Error al registrarse");
       })
       .finally(() => setLoading(false));
+  };
+
+  const handleGoToInicio = () => {
+    navigate('/');
+  };
+
+  const handleReset = () => {
+    setError('');
+    setSuccess('');
   };
 
   return (
     <section className='formularioPage'>
       <h2 className='tituloPage'>Registro</h2>
-      <Formulario onData={handleRegister} loading={loading} />
+      <Formulario onData={handleRegister} loading={loading} onReset={handleReset} />
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {success && <p>{success} <Link to='/login'>Inicia Sesion</Link></p>}
       <p>¿Ya tienes cuenta? <Link to='/login'>Iniciar Sesion</Link></p>
-      <button><Link to='/'>Ir a inicio </Link></button>      
+      <button onClick={handleGoToInicio}>Ir a inicio</button>
     </section>
   );
 };

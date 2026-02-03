@@ -40,12 +40,7 @@ button a{
   margin:0px;
 }
 
-.contenedor-logo h2{
 
-  margin-left: 0px;
-  margin-top: 1.5em;
-  text-shadow:var(--cuaternario) 10px 0 5px;
-}
 
 .logo{
     display: flex;
@@ -69,9 +64,11 @@ button a{
 
 .navegacion{
   height: 4rem;
+  margin: 0px;
+  padding-left: 0px;
   display: flex;
   flex-direction: row;
-  justify-content: space-evenly;
+  justify-content: space-around;
   background-color: var(--cuaternario);
   background-size: cover;
 }
@@ -183,14 +180,11 @@ button a{
 }
 
 
-
-
-
-
-
 .formulario-contenedor {
+    display: flex;
+    flex-direction: column;
     max-height: 50rem;
-    max-width: 20rem;
+    max-width: 30rem;
     padding: 20px;
     box-sizing: border-box;
     background-color: #fff;
@@ -199,9 +193,39 @@ button a{
     margin: 0 220px;
 }
 
+
+
 .formulario-contenedor a{
   color: darkblue;
 }
+
+.formulario-contenedor-filtro {
+  display:flex;
+  flex-direction: row;
+  max-height: 50rem;
+  max-width: 100%;
+  padding: 20px;
+  align-items: center;
+  box-sizing: border-box;
+  background-color: var(--cuaternario);
+  background-size: cover;
+  border: 1px solid black;
+  border-radius: 8px;
+  margin: 0 10%;
+  color: var(--quintario);
+  font-weight: bold;
+}
+
+.formulario-contenedor-filtro button{
+  background-color: var(--terciario);
+}
+
+
+.formulario-contenedor-filtro-texto input{
+  height: 1px;
+}
+
+
 
 .formularioPage  {
   display: flex;
@@ -217,7 +241,7 @@ button a{
 }
 
 .formularioPage a:hover{
-  color: var(--terciario);
+  color: var(--cuaternario);
   text-decoration: underline;
   background-color: transparent;
   text-decoration-color: var(--cuaternario) ;
@@ -249,3 +273,14 @@ button a{
   justify-content: right;
 }
 
+
+.juego-page{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.paginacion{
+
+  margin-top: 1em;
+} 
